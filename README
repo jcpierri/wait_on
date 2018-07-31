@@ -1,0 +1,9 @@
+The wait_on command allows shell scripts to access the facilities provided
+by kqueue(3) on FreeBSD.
+
+The wait_on command waits for something to happen to the files or
+directories given as arguments and then exits.  It is anticipated that the
+wait_on command will allow, for example, a script to sleep until files have
+been added to a directory or data is appended to a file.
+
+No polling is required.

@@ -1,0 +1,283 @@
+.\" Copyright 2002 Andrew Stevenson <andrew@ugh.net.au>
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions are met:
+.\" 
+.\" 1.  Redistributions of source code must retain the above copyright notice,
+.\"     this list of conditions and the following disclaimer.
+.\" 
+.\" 2.  Redistributions in binary form must reproduce the above copyright
+.\"     notice, this list of conditions and the following disclaimer in the
+.\"     documentation and/or other materials provided with the distribution.
+.\" 
+.\" 3.  Neither the name of the copyright holder nor the names of its
+.\"     contributors may be used to endorse or promote products derived from this
+.\"     software without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+.\" LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+.\" CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+.\" SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+.\" INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+.\" CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+.\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+.\" POSSIBILITY OF SUCH DAMAGE.
+.\" 
+.\" That said I'd appreciate a message if you use this software in anyway.
+.\"                                               Andrew <andrew@ugh.net.au>
+.\"
+.Dd January 29, 2002
+.Dt WAIT_ON 1
+.Sh NAME
+.Nm wait_on
+.Nd wait for a file or directory to be changed
+.Sh SYNOPSIS
+.Nm
+.Op Fl c
+.Op Fl h
+.Op Fl i
+.Op Fl v
+.Op Fl w
+.Op Fl t Ar timeout
+.Ar
+.Sh DESCRIPTION
+The
+.Nm
+command waits for something to happen to the files or directories given as
+arguments and then exits. It is anticipated that the
+.Nm
+command will be called from a shell script, allowing, for example, a script
+to sleep until files have been added to a directory or data is appended to a
+file. No polling is required.
+.Pp
+The following options are available:
+.Bl -tag -width indent
+.It Fl c
+Print version string, copyright notice and exit.
+.It Fl h
+Write information about changes to the standard output (possibly for for a
+human to read).
+.It Fl i
+Exit with an exit value that indicates to which file or directory an event has
+occured.
+.It Fl v
+Print version string, copyright notice and exit.
+.It Fl w
+Only exit when something is written (i.e. ignore all other types of events).
+Writing includes a file being added to a directory.
+.It Fl t
+Wait for
+.Ar timeout
+seconds for an event to occur and if none has exit anyway. The
+.Ar timeout
+value may be 0 to effect an odd kind of poll.
+.El
+.Pp
+The
+.Nm
+command must be able to open
+.Ar file
+for reading.
+.Sh IMPLEMENTATION NOTES
+The
+.Nm
+command is implemented using the facilities provided by
+.Xr kqueue 3 .
+.Sh EXIT VALUES
+If a fatal error occurs
+.Nm
+exists with a value documented in
+.Xr sysexits 3 .
+.Pp
+An exit value of 0 indicates a timeout has occured.
+.Pp
+If the
+.Fl i
+flag is in effect then the exit value of
+.Nm
+indicates to which argument the exit causing event has occured. A value of 1
+indicates the event occured to the first file or directory, 2 indicating the
+event occured to the second file or directory and so on.
+.Pp
+If the
+.Fl i
+flag is not in effect the exit value of
+.Nm
+is dependent on what event caused
+.Nm
+to exit.
+.Bl -tag -width indent
+.It 0
+.Ar timeout
+seconds have elapsed with no reportable events occuring.
+.It 1
+The file or directory
+.Ar file
+was deleted. See
+.Xr unlink 2 .
+.It 2
+The file
+.Ar file
+was written to or, if
+.Ar file
+is a directory, a file was added to or removed from
+.Ar file .
+.It 3
+The file or directory
+.Ar file
+was extended. See
+.Xr truncate 2 .
+.It 4
+The attributes of
+.Ar file
+have changed. This includes permissions and file flags. See
+.Xr chmod 2
+and
+.Xr chflags 2 .
+.It 5
+The link count of
+.Ar file
+has changed. See
+.Xr link 2 .
+.It 6
+The file or directory
+.Ar file
+has been renamed. See
+.Xr rename 2 .
+.It 7
+Access to the file or directory
+.Ar file
+has been revoked. See
+.Xr revoke 2
+and
+.Xr unmount 2 .
+.El
+.Sh EXAMPLES
+.Bl -enum
+.It
+The following example will watch your mailbox and tell you if it is
+written to (as is the case when new mail arrives).
+.Bd -literal -offset indent
+.Ic wait_on -hw $MAIL
+.Ed
+.Pp
+The output might be something like:
+.Bd -literal -offset indent
+/var/mail/andrew: written extended
+.Ed
+.Pp
+.Nm
+would then exit with code 2.
+.It
+The following example could be used as a basis of a script to regularly clear
+out the incoming directory of an FTP site.
+.Pp
+.Bd -literal -offset indent
+SOURCE=/ftp/root/incoming 
+DESTINATION=/ftp/uploaded_files 
+
+while :; do
+	mv $SOURCE/* $DESTINATION
+	wait_on -w $SOURCE
+done
+.Ed
+.Pp
+.Em You must NOT use this script as is on a directory that untrusted users may write to. Security problems abound!
+.It
+The following example demonstrates the use of the
+.Fl i
+and
+.Fl t
+flags. It displays a message indicating which, if either, of the files whose
+names are stored in
+.Va FILE1
+or
+.Va FILE2
+changes first, timing out after one minute.
+.Bd -literal -offset indent
+FILE1=1
+FILE2=2
+
+wait_on -t 60 -i $FILE1 $FILE2  
+
+case $? in
+0)
+    echo Neither the file $FILE1 or the file $FILE2 changed.
+    ;;
+1)
+    echo File $FILE1 has been changed.
+    ;;
+2)
+    echo File $FILE2 has been changed.
+    ;;
+esac
+.Ed
+.El
+.Sh DIAGNOSTICS
+For exit values see the
+.Sx EXIT VALUES
+section.
+.Pp
+.Bl -diag
+.It invalid timeout
+The argument given to
+.Fl t
+was not parsable as an integer between 0 and
+.Dv LONG_MAX
+inclusive.
+.It can't open file for reading
+To monitor files or directories
+.Nm
+must be able to open them for reading.
+.It -i specified with >= 64 files - exit code may be ambiguous
+If you use the
+.Fl i
+flag and specify a lot of files it is possible that
+.Nm
+may exit with a value that is both defined in
+.Xr sysexits 3
+and is also the valid index of an argument. This is ambiguous. A warning is produced but
+the action is allowed.
+.It unknown event of type 7 occured to file
+an event has occured to a monitored file or directory of a type that
+.Nm
+doesn't recognise.
+.It event on unknown file (file)
+.Nm
+has been informed that an event occured on a file that it wasn't monitoring.
+This should never occur.
+.El
+.Sh SEE ALSO
+.Xr newmail 1 ,
+.Xr kqueue 3
+.Sh HISTORY
+The
+.Nm
+command was written in January 2002.
+.Nm
+was written under
+.Fx 4.4 .
+.Sh AUTHORS
+.An "Andrew Stevenson" Aq andrew@ugh.net.au
+.Sh BUGS
+.Bl -item
+.It
+It is not easy to find out which event happend to which file. Normally you can
+find out one or the other. The workaround is to use the
+.Fl h
+flag and parse the output.
+.It
+The
+.Nm
+command uses
+.Xr kqueue 3
+and at the time of this writing
+.Xr kqueue 3
+could only monitor files on UFS filesystems.
+.It
+Please report any other problems or requests for enhancements to
+.Aq andrew@ugh.net.au .
+.El
