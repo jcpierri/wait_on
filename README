@@ -7,3 +7,155 @@ wait_on command will allow, for example, a script to sleep until files have
 been added to a directory or data is appended to a file.
 
 No polling is required.
+
+SYNOPSIS
+     wait_on [-c] [-h] [-i] [-v] [-w] [-t timeout] file	...
+
+DESCRIPTION
+     The wait_on command waits for something to	happen to the files or direc-
+     tories given as arguments and then	exits. It is anticipated that the
+     wait_on command will be called from a shell script, allowing, for exam-
+     ple, a script to sleep until files	have been added	to a directory or data
+     is	appended to a file. No polling is required.
+
+     The following options are available:
+
+     -c	     Print version string, copyright notice and	exit.
+
+     -h	     Write information about changes to	the standard output (possibly
+	     for for a human to	read).
+
+     -i	     Exit with an exit value that indicates to which file or directory
+	     an	event has occured.
+
+     -v	     Print version string, copyright notice and	exit.
+
+     -w	     Only exit when something is written (i.e. ignore all other	types
+	     of	events).  Writing includes a file being	added to a directory.
+
+     -t	     Wait for timeout seconds for an event to occur and	if none	has
+	     exit anyway. The timeout value may	be 0 to	effect an odd kind of
+	     poll.
+
+     The wait_on command must be able to open file for reading.
+
+IMPLEMENTATION NOTES
+     The wait_on command is implemented	using the facilities provided by
+     kqueue(3).
+
+EXIT VALUES
+     If	a fatal	error occurs wait_on exists with a value documented in
+     sysexits(3).
+
+     An	exit value of 0	indicates a timeout has	occured.
+
+     If	the -i flag is in effect then the exit value of	wait_on	indicates to
+     which argument the	exit causing event has occured.	A value	of 1 indicates
+     the event occured to the first file or directory, 2 indicating the	event
+     occured to	the second file	or directory and so on.
+
+     If	the -i flag is not in effect the exit value of wait_on is dependent on
+     what event	caused wait_on to exit.
+
+     0	     timeout seconds have elapsed with no reportable events occuring.
+
+     1	     The file or directory file	was deleted. See unlink(2).
+
+     2	     The file file was written to or, if file is a directory, a	file
+	     was added to or removed from file.
+
+     3	     The file or directory file	was extended. See truncate(2).
+
+     4	     The attributes of file have changed. This includes	permissions
+	     and file flags. See chmod(2) and chflags(2).
+
+     5	     The link count of file has	changed. See link(2).
+
+     6	     The file or directory file	has been renamed. See rename(2).
+
+     7	     Access to the file	or directory file has been revoked. See
+	     revoke(2) and unmount(2).
+
+EXAMPLES
+     1.	  The following	example	will watch your	mailbox	and tell you if	it is
+	  written to (as is the	case when new mail arrives).
+
+		wait_on	-hw $MAIL
+
+	  The output might be something	like:
+
+		/var/mail/andrew: written extended
+
+	  wait_on would	then exit with code 2.
+
+     2.	  The following	example	could be used as a basis of a script to	regu-
+	  larly	clear out the incoming directory of an FTP site.
+
+		SOURCE=/ftp/root/incoming
+		DESTINATION=/ftp/uploaded_files
+
+		while :; do
+			mv $SOURCE/* $DESTINATION
+			wait_on	-w $SOURCE
+		done
+
+	  You must NOT use this	script as is on	a directory that untrusted
+	  users	may write to. Security problems	abound!
+
+     3.	  The following	example	demonstrates the use of	the -i and -t flags.
+	  It displays a	message	indicating which, if either, of	the files
+	  whose	names are stored in FILE1 or FILE2 changes first, timing out
+	  after	one minute.
+
+		FILE1=1
+		FILE2=2
+
+		wait_on	-t 60 -i $FILE1	$FILE2
+
+		case $?	in
+		0)
+		    echo Neither the file $FILE1 or the	file $FILE2 changed.
+		    ;;
+		1)
+		    echo File $FILE1 has been changed.
+		    ;;
+		2)
+		    echo File $FILE2 has been changed.
+		    ;;
+		esac
+
+DIAGNOSTICS
+     For exit values see the EXIT VALUES section.
+
+     invalid timeout  The argument given to -t was not parsable	as an integer
+     between 0 and LONG_MAX inclusive.
+
+     can't open	file for reading  To monitor files or directories wait_on must
+     be	able to	open them for reading.
+
+     -i	specified with >= 64 files - exit code may be ambiguous	 If you	use
+     the -i flag and specify a lot of files it is possible that	wait_on	may
+     exit with a value that is both defined in sysexits(3) and is also the
+     valid index of an argument. This is ambiguous. A warning is produced but
+     the action	is allowed.
+
+     unknown event of type 7 occured to	file  an event has occured to a	moni-
+     tored file	or directory of	a type that wait_on doesn't recognise.
+
+     event on unknown file (file)  wait_on has been informed that an event
+     occured on	a file that it wasn't monitoring.  This	should never occur.
+
+HISTORY
+     The wait_on command was written in	January	2002.  wait_on was written
+     under FreeBSD 4.4.
+
+AUTHORS
+     Andrew Stevenson <andrew@ugh.net.au>
+
+BUGS
+     It	is not easy to find out	which event happend to which file. Normally
+     you can find out one or the other.	The workaround is to use the -h	flag
+     and parse the output.
+
+     The wait_on command uses kqueue(3)	and at the time	of this	writing
+     kqueue(3) could only monitor files	on UFS filesystems.
